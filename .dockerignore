@@ -1,0 +1,7 @@
+# https://docs.docker.com/engine/reference/builder/#/dockerignore-file
+venv/
+*.zip
+data/
+temp.*
+.vscode/
+__pycache__/

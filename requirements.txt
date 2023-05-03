@@ -1,0 +1,6 @@
+dask[dataframe]
+kaggle==1.5.13
+pandas==2.0.1
+python-dotenv==1.0.0
+scikit-learn==1.2.2
+Flask==2.3.2
