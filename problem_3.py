@@ -8,7 +8,23 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, make_scorer
 from datetime import datetime
 from joblib import dump
 
+"""
+To train a random forest regressor model with highest score, it is necessary to optimize its hyper parameter
+but the amount of data doesn't allow for this on the full data (at lest on my system). 
+The easiest solution is to sample the existing data, perform the optimization on the sample
+and then train the model on the complete dataset based on the best performing params.
+"""
+
 def prepare_data(symbol_n: int | None = None):
+    """ This method extracts the columns "Date","Volume","vol_moving_avg", "adj_close_rolling_med" from
+    the saved data and sets the "Date" as index.
+
+    I wrote this method because most of the data preparation is repetitive. The only difference is that if
+    we prepare the data for optimization, we will take a sample out of the whole data.
+    To sample the data, We choose an arbitrary number of symbols to sample and then take out the entire dataset for those
+    symbols. This might mitigate the risk of missing the market mega trends (e.g. economic down turns) in the trained
+    model.
+    """
     print("Fetching Data")
     data = dd.read_parquet("data/stage_2/stocks")
 
@@ -33,6 +49,10 @@ def prepare_data(symbol_n: int | None = None):
 
 
 def optimize_hyper_params(X,y):
+    """
+    To optimize the hyper parameters I used the 'RandomizedSearchCV'
+    (Cross validation for hyper parameter optimization is necessary)
+    """
     
     common_params = {
         'n_estimators': [50,100,150], 
@@ -49,6 +69,10 @@ def optimize_hyper_params(X,y):
     return best_params
 
 def final_training(params:dict,X,y):
+    """
+    Although I used the hyper parameter optimization for the model, the results where under performing.
+    For the final training I still used the train-test split to calculate mae and mse.
+    """
     model = RandomForestRegressor(n_jobs=-1, random_state=42, verbose=1,**params)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model.fit(X_train, y_train)
@@ -67,7 +91,3 @@ def run():
     X,y = prepare_data()
     trained_model = final_training(params,X,y)
     dump(trained_model,"random_forest_trained.joblib")
-
-
-if __name__ == "__main__":
-    run()
