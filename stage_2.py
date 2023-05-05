@@ -1,4 +1,6 @@
 import dask.dataframe as dd
+from logging import getLogger
+logger = getLogger(__name__)
 
 def calculate_rolling(dask_df):
     # From the loaded dask dataframe (passed as param), get the full data of these 3 columns: "Symbol","Volume","Adj Close"
@@ -15,12 +17,15 @@ def calculate_rolling(dask_df):
     # Joining the newly calculated value to the present dataframe
     return dask_df.join(mov_avg_volume.join(mov_median_adj_close).reset_index(drop=True))
 
-def run():
+def run_stage_2():
     for sec_type in ["stocks","etfs"]:
         # Read the saved parquet data into dask dataframe
+        logger.info(f"Reading the stage_1 parquet files for {sec_type}")
         df = dd.read_parquet(f"data/stage_1/{sec_type}")
         # Calculation of rolling values and joining to the current dataframe
+        logger.info("Engineering new features")
         df = calculate_rolling(df)
         # Saving the updated dataframe
+        logger.info(f"Saving the modified dataset to 'data/stage_2/{sec_type}'")
         df.to_parquet(f"data/stage_2/{sec_type}",write_index=False)
     

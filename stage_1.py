@@ -5,10 +5,10 @@ import zipfile
 import re
 import numpy as np
 import os
+from logging import getLogger
 load_dotenv(".env")
-DOWNLOADED_FILE_NAME = "stock-market-dataset.zip"
-UNPACKED_FOLDER_NAME = "stock_market_dataset"
 reg = re.compile(r".*?(\w*#?)\.csv")
+logger = getLogger(__name__)
 
 
 def download_and_unpack():
@@ -19,8 +19,11 @@ def download_and_unpack():
 
     from kaggle.api.kaggle_api_extended import KaggleApi
     api = KaggleApi()
+    logger.info("Authenticating into Kaggle")
     api.authenticate()
+    logger.info("Downloading the dataset")
     api.dataset_download_files(dataset="jacksoncrow/stock-market-dataset", path="data/initial")
+    logger.info("Download completed. Unzipping the dataset into 'data/initial/stock_market_dataset'")
     with zipfile.ZipFile("stock-market-dataset.zip", 'r') as zip_ref:
         zip_ref.extractall("data/initial/stock_market_dataset")
 
@@ -39,19 +42,20 @@ def write_securities():
     """
     symbols_df = pd.read_csv("data/initial/stock_market_dataset/symbols_valid_meta.csv",usecols=["Symbol","Security Name"])
     for sec_type, n_partitions in [("stocks",100),("etfs",30)]:
+        logger.info(f"Read the dataset for {sec_type}")
         df = dd.read_csv(f"data/initial/stock_market_dataset/{sec_type}/*.csv",include_path_column=True,assume_missing=True)
         df = df.repartition(n_partitions)
         df['Volume'] = np.floor(pd.to_numeric(df['Volume'].fillna(-1), errors='coerce')).astype('int64')
         df["path"] = df["path"].map(lambda x: reg.findall(x)[0])
         df = df.rename(columns={"path":"Symbol"})
         df = df.merge(right=symbols_df, how="left",on="Symbol")
+        logger.info(f"Save the converted {sec_type} data set as parquet format on 'data/stage_1/{sec_type}'")
         df.to_parquet(f"data/stage_1/{sec_type}",write_index=False)
 
-def run():
+def run_stage_1():
+    logger.info("Creating initial data dirs")
     os.makedirs("data/initial", exist_ok=True)
+    logger.info("Starting fetching data from Kaggle")
     download_and_unpack()
+    logger.info("Converting securities datasets to parquet format and write to disk")
     write_securities()
-    
-
-if __name__ == "__main__":
-    run()

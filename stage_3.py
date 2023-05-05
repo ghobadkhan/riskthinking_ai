@@ -7,6 +7,9 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, make_scorer
 from datetime import datetime
 from joblib import dump
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 """
 To train a random forest regressor model with highest score, it is necessary to optimize its hyper parameter
@@ -25,7 +28,6 @@ def prepare_data(symbol_n: int | None = None):
     symbols. This might mitigate the risk of missing the market mega trends (e.g. economic down turns) in the trained
     model.
     """
-    print("Fetching Data")
     data = dd.read_parquet("data/stage_2/stocks")
 
     if symbol_n:
@@ -59,12 +61,11 @@ def optimize_hyper_params(X,y):
         'min_samples_leaf' : [1,2,3,4], 
         'max_depth':[5, 10, None]
     }
-    print(f"Optimizing hyper parameters")
     clf = RandomizedSearchCV(estimator=RandomForestRegressor(n_jobs=-1, random_state=42), param_distributions=common_params, verbose=3, n_iter=10)
     clf.fit(X, y)
 
     best_params = clf.best_params_
-    print(best_params)
+    logger.info(f"Best calculated parameters are: {best_params}")
 
     return best_params
 
@@ -81,13 +82,18 @@ def final_training(params:dict,X,y):
     mae = mean_absolute_error(y_test, y_pred)
     mse = mean_squared_error(y_test, y_pred)
 
-    print(f"mae: {mae} - mse: {mse}")
+    logger.info(f"mae: {mae} - mse: {mse}")
 
     return model
 
-def run():
-    X_sample, y_sample = prepare_data(symbol_n = 100)
+def run_stage_3(symbol_n=100):
+    logger.info(f"Sampling data for hyper parameter optimization. Number of sampled symbols: {symbol_n}")
+    X_sample, y_sample = prepare_data(symbol_n)
+    logger.info("Optimizing hyper parameters")
     params = optimize_hyper_params(X_sample,y_sample)
+    logger.info("Fetching the entire dataset")
     X,y = prepare_data()
+    logger.info("Training the model based on the best performing params")
     trained_model = final_training(params,X,y)
+    logger.info("Saving the trained model to 'random_forest_trained.joblib'")
     dump(trained_model,"random_forest_trained.joblib")
